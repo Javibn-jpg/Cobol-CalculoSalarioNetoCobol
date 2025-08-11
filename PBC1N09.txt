@@ -1,0 +1,153 @@
+      *----------------------------------------------------------------*
+       IDENTIFICATION DIVISION.
+      *----------------------------------------------------------------*
+       PROGRAM-ID. PBC1N09.
+       AUTHOR. JAVIER BEUZON.
+      *
+      * Programa que reescribe fichero PS y calcula el salario neto
+      *----------------------------------------------------------------*
+       ENVIRONMENT DIVISION.
+      *----------------------------------------------------------------*
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           DECIMAL-POINT IS COMMA.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT EMPLEADOS
+                  ASSIGN FICH01
+                  ORGANIZATION IS SEQUENTIAL
+                  ACCESS MODE IS SEQUENTIAL
+                  FILE STATUS FS-EMPLEADOS.
+      *----------------------------------------------------------------*
+       DATA DIVISION.
+      *----------------------------------------------------------------*
+       FILE SECTION.
+       FD  EMPLEADOS
+           LABEL RECORD IS STANDARD
+           BLOCK CONTAINS 0 RECORDS
+           RECORDING MODE IS F
+           DATA RECORD IS REG-EMPLEADOS.
+       01  REG-EMPLEADOS         PIC X(100).
+
+       WORKING-STORAGE SECTION.
+       01  WS-CONTANTES.
+           05 CTE-NOMPGM         PIC X(7)  VALUE 'PBC1N09'.
+       01  WS-VARIABLES.
+           05 FS-EMPLEADOS       PIC 9(2)  VALUE ZEROES.
+           05 IO-EMPLEADOS-REG.
+              10 IO-CODIGO       PIC 9(5)              VALUE ZEROES.
+              10 IO-NOMBRE       PIC X(24)             VALUE SPACES.
+              10 IO-DIRECCION    PIC X(30)             VALUE SPACES.
+              10 IO-POBLACION    PIC X(10)             VALUE SPACES.
+              10 FILLER          PIC X(09)             VALUE SPACES.
+              10 IO-IRPF         PIC 9(2)              VALUE ZEROES.
+              10 IO-BRUTO        PIC S9(7)V9(2) COMP-3 VALUE ZEROES.
+              10 IO-NETO         PIC Z.ZZZ.ZZ9,99      VALUE ZEROES.
+              10 FILLER          PIC X(5)              VALUE SPACES.
+       01  CONTADORES.
+           05 CTR-LEIDOS         PIC 9(2).
+           05 CTR-REGRABADOS     PIC 9(2).
+       01  SWITCHES.
+           05 SW-EMPLEADOS       PIC X     VALUE 'N'.
+              88 END-EMPLEADOS             VALUE 'Y'.
+           05 SW-VACIO           PIC X     VALUE 'N'.
+              88 YES-VACIO                 VALUE 'Y'.
+
+      *----------------------------------------------------------------*
+       PROCEDURE DIVISION.
+      *----------------------------------------------------------------*
+           PERFORM 1000-INICIO
+           PERFORM 2000-PROCESS UNTIL END-EMPLEADOS
+           PERFORM 3000-END
+           .
+
+      *------------*
+       1000-INICIO.
+      *------------*
+           INITIALIZE CONTADORES
+
+           PERFORM 1100-ABRIR-FICHEROS
+
+           PERFORM 2100-LEER
+           IF END-EMPLEADOS
+              SET YES-VACIO TO TRUE
+           END-IF
+           .
+
+       1100-ABRIR-FICHEROS.
+      * output: modo escritura
+      * i-o   : modo lectura y escritura (no org. LINE SEQUENTIAL)
+      * input : modo lectura
+      * extend: modo escritura (a adir contenido al final)
+      *    OPEN INPUT EMPLEADOS REVERSED
+      *    OPEN INPUT EMPLEADOS REVERSED WITH NO REWIND
+      *    OPEN INPUT EMPLEADOS
+
+           OPEN EXTEND EMPLEADOS
+           IF FS-EMPLEADOS NOT = ZEROES
+              DISPLAY 'ERROR AL ABRIR EMPLEADOS:' FS-EMPLEADOS
+              PERFORM 9990-CANCELAR
+           END-IF
+           .
+
+      *------------*
+       2000-PROCESS.
+      *------------*
+           COMPUTE IO-NETO = IO-BRUTO - ((IO-IRPF / 100 ) * IO-BRUTO)
+      *    MOVE IO-NETO TO IO-SALARIO-EDITADO
+
+           REWRITE REG-EMPLEADOS FROM IO-EMPLEADOS-REG
+           IF FS-EMPLEADOS NOT = ZEROES
+              DISPLAY 'ERROR AL REGRABAR FICHERO: ' FS-EMPLEADOS
+              PERFORM 9990-CANCELAR
+           ELSE
+              ADD 1 TO CTR-REGRABADOS
+           END-IF
+
+           PERFORM 2100-LEER
+           .
+
+       2100-LEER.
+           READ EMPLEADOS INTO IO-EMPLEADOS-REG
+             AT END
+                SET END-EMPLEADOS TO TRUE
+             NOT AT END
+                ADD 1 TO CTR-LEIDOS
+           END-READ
+
+           IF FS-EMPLEADOS NOT EQUAL ZEROES AND 10
+              DISPLAY 'ERROR AL LEER EMPLEDOS: ' FS-EMPLEADOS
+              PERFORM 9990-CANCELAR
+           END-IF
+           .
+
+      *------------*
+       3000-END.
+      *------------*
+           IF YES-VACIO
+              DISPLAY 'FICHERO DE EMPLEADOS VAC O'
+           END-IF
+
+           CLOSE EMPLEADOS
+           IF FS-EMPLEADOS NOT = ZEROES
+              DISPLAY 'ERROR AL CERRAR EMPLEADOS: ' FS-EMPLEADOS
+           END-IF
+
+           DISPLAY 'CONTADOR EMPLEADOS LEIDOS    : ' CTR-LEIDOS
+           DISPLAY 'CONTADOR EMPLEADOS REGRABADOS: ' CTR-REGRABADOS
+
+           STOP RUN.
+
+      *------------*
+       9990-CANCELAR.
+      *------------*
+           DISPLAY '************************************'
+           DISPLAY ' SE CANCELA EL PROGRAMA Y LA CADENA '
+           DISPLAY '************************************'
+           DISPLAY ' REGISTROS LEIDOS    : ' CTR-LEIDOS
+           DISPLAY ' REGISTROS REGRABADOS: ' CTR-REGRABADOS
+           CLOSE EMPLEADOS
+           MOVE 1001 TO RETURN-CODE
+           STOP RUN.
+
+
